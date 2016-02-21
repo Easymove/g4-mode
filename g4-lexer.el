@@ -4,9 +4,11 @@
 
 (defclass position ()
   ((line :accessor line
-         :initarg :line)
+         :initarg :line
+         :type number)
    (column :accessor column
-           :initarg :column)))
+           :initarg :column
+           :type number)))
 
 (defclass lexem ()
   ((start-position :accessor spos
@@ -102,9 +104,6 @@
 
 (defun identifier-p (str)
   (string-match-p "[_[:word:]]*" str))
-
-(defun delimiter-p (str)
-  (string-match-p "[][;:()+*|?.]*" str))
 
 (defun multi-delimiter-p (str)
   (string-match-p "//(->//)" str))
@@ -228,5 +227,149 @@
         (%mk-ident))
       (reverse res))))
 
-(defun test () (lexer "Aa:Bb'sh;t 'Cc|Dd;
-Bb:Ee;"))
+
+;;; -------------------------------------------------------
+;;; basic mixins
+;;; -------------------------------------------------------
+(defclass members-mixin ()
+  ((members :accessor node-members
+             :initarg :members
+             :initform nil)))
+
+(defclass named-mixin ()
+  ((name :accessor node-name
+          :initarg :name
+          :initform nil)))
+
+(defclass position-mixin ()
+  ((start-position :accessor spos
+                   :initarg :start
+                   :type position)
+   (end-position :accessor epos
+                 :initarg :end
+                 :type position)))
+
+(defclass value-mixin ()
+  ((value :accessor node-value
+          :initarg :value
+          :initform nil)))
+
+;;; Nodes
+(defclass node (position-mixin)
+  ())
+
+(defclass grammar-node (node named-mixin members-mixin)
+  ())
+
+(defclass rule-node (node named-mixin members-mixin)
+  ())
+
+(defclass command-node (node members-mixin)
+  ())
+
+(defclass entity-node (node value-mixin)
+  ())
+
+(defclass sort-node (node named-mixin)
+  ())
+
+
+;;; Parser
+(defun parser (lexems)
+  (grammar lexems))
+
+(defun grammar (lexems)
+  (rule-list lexems))
+
+(defun rule-list (lexems)
+  (when lexems
+    (let* ((rule/rest (rule lexems))
+           (rule (car rule/rest))
+           (rest (cdr rule/rest)))
+      (append rule (rule-list rest)))))
+
+(defun rule (lexems)
+  (when lexems
+    (let* ((sort/rest (sort lexems))
+           (sort (car sort/rest))
+           (rest (cdr sort/rest)))
+      (unless (typep (car rest) 'column)
+        (error "RULE: column expected. line: %d column: %d"
+               (line (spos (car rest)))
+               (column (spos (car rest)))))
+      (let* ((command-list/rest (command-list (cdr rest)))
+             (command-list (car commad-list/rest))
+             (rest (cdr command-list/rest)))
+        (unless (typep (car rest) 'semi-column)
+          (error "RULE: semi-column expected. line: %d column: %d"
+                 (line (spos (car rest)))
+                 (column (spos (car rest)))))
+        (cons (make-instance 'rule-node
+                             :name sort
+                             :members command-list
+                             :start (spos sort)
+                             :end (epos (car rest)))
+              (cdr rest))))))
+
+(defun sort (lexems)
+  (when lexems
+    (if (typep (car lexems) 'identifier)
+        (cons (make-instance 'sort-node
+                             :name (name (car lexems))
+                             :start (spos (car lexems))
+                             :end (epos (second lexems)))
+              (cdr lexems))
+      (error "SORT: identifier expected. line: %d column: %d"
+             (line (spos (car lexems)))
+             (column (spos (car lexems)))))))
+
+(defun command-list (lexems)
+  (when lexems
+    (let* ((command/rest (command lexems))
+           (command (car command/rest))
+           (rest (cdr command/rest)))
+      (cons command (command-list-rest rest)))))
+
+(defun command-list-rest (lexems)
+  (when lexems
+    (unless (typep (car lexems) 'pipe)
+      (error "COMMAND-REST: pipe expected. line: %d column: %d"
+             (line (spos (car lexems)))
+             (column (spos (car lexems)))))
+    (let* ((command/rest (command lexems))
+           (command (car command/rest))
+           (rest (cdr command/rest)))
+      (cons command (command-list-rest rest)))))
+
+(defun command (lexems)
+  (let* ((ent-list/rest (entity-list lexems))
+         (ent-list (car ent-list/rest))
+         (rest (cdr ent-list/rest)))
+    (cons (make-instance 'command-node
+                         :members ent-list
+                         :start (spos (car ent-list))
+                         :ent (epos (car (last ent-list))))
+          rest)))
+
+(defun entity-list (lexems)
+  (when lexems
+    (let* ((entity/rest (entity lexems))
+           (entity (car entity/rest))
+           (rest (cdr entity/rest)))
+      (if entity
+          (append (list entity) (entity-list rest))
+        rest))))
+
+(defun entity (lexems)
+  (when lexems
+    (if (or (typep (car lexems) 'identifier)
+            (typep (car lexems) 'literal))
+        (cons (make-instance 'entity-node
+                             :value (car lexems)
+                             :start (spos (car lexems))
+                             :end (epos (car lexems)))
+              (cdr lexems))
+      (list nil lexems))))
+
+
+(defun test () (entity (lexer "Aa")))
