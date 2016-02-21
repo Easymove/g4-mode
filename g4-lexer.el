@@ -84,24 +84,31 @@
             (setf (gethash x res) t)) lst)
     res))
 
-(defvar *delimiters* (make-hash-set '(?\; ?\: ?\( ?\) ?\[ ?\] ?\+ ?\* ?\| ?\? ?\.) :test #'eq))
 
-(defun delimiter-p (char)
-  (gethash char *delimiters*))
+;;; ---------------------------------------------------------
+;;; lexer regexps
+;;; ---------------------------------------------------------
+(defun delimiter-char-p (char)
+  (string-match-p "[][;:()+*|?.]" (char-to-string char)))
 
-(defvar *whitespaces* (make-hash-set '(?\s ?\n ?\t) :test #'eq))
-
-(defun whitespace-p (char)
-  (gethash char *whitespaces*))
-
-(defvar *literal-chars* (make-hash-set '(?\') :test #'eq))
+(defun whitespace-char-p (char)
+  (string-match-p "[\s\n\t]" (char-to-string char)))
 
 (defun literal-char-p (char)
-  (gethash char *literal-chars*))
+  (string-match-p "[']" (char-to-string char)))
 
-(defun identifier-p (char)
-  (or (eq char ?_)
-      (string-match-p "[[:word:]]" (char-to-string char))))
+(defun identifier-char-p (char)
+  (string-match-p "[_[:word:]]" (char-to-string char)))
+
+(defun identifier-p (str)
+  (string-match-p "[_[:word:]]*" str))
+
+(defun delimiter-p (str)
+  (string-match-p "[][;:()+*|?.]*" str))
+
+(defun multi-delimiter-p (str)
+  (string-match-p "//(->//)" str))
+
 
 (defun str-next (str)
   (substring str 1 (length str)))
@@ -129,20 +136,20 @@
                                      :column *cur-column*
                                      :line *cur-line*)))
 
-(defun make-delim (ch)
+(defun make-delim (str)
   (let ((type (cond
-               ((eq ch ?\;) 'semi-column)
-               ((eq ch ?:) 'column)
-               ((eq ch ?\() 'o-parenthesis)
-               ((eq ch ?\)) 'c-parenthesis)
-               ((eq ch ?\[) 'o-bracket)
-               ((eq ch ?\]) 'c-bracket)
-               ((eq ch ?+) 'plus)
-               ((eq ch ?*) 'star)
-               ((eq ch ?|) 'pipe)
-               ((eq ch ??) 'interrogation)
-               ((eq ch ?.) 'dot)
-               (t (error "%s is not a delimiter" (char-to-string ch))))))
+               ((equal str ";") 'semi-column)
+               ((equal str ":") 'column)
+               ((equal str "(") 'o-parenthesis)
+               ((equal str ")") 'c-parenthesis)
+               ((equal str "[") 'o-bracket)
+               ((equal str "]") 'c-bracket)
+               ((equal str "+") 'plus)
+               ((equal str "*") 'star)
+               ((equal str "|") 'pipe)
+               ((equal str "?") 'interrogation)
+               ((equal str ".") 'dot)
+               (t (error "%s is not a delimiter" str)))))
     (make-instance type
                    :start (make-instance 'position
                                          :column *cur-column*
@@ -163,48 +170,63 @@
 (defun lexer (str)
   (unless (str-empty-p str)
     (let ((*cur-line* 1) (*cur-column* 1)
-          (acc "") (res) (in-literal))
+          (acc "") (lit-acc "") (delim-acc "")
+          (res) (in-literal))
 
-      (mapc
-       (lambda (ch)
-         (cond
-          ((literal-char-p ch)
-           (if (eq ch in-literal)
+      (cl-labels
+          ((%mk-delim ()
+                      (unless (str-empty-p delim-acc)
+                        (push (make-delim delim-acc) res)
+                        (setf delim-acc "")))
+           (%mk-ident ()
+                      (unless (str-empty-p acc)
+                        (push (make-id acc) res)
+                        (setf acc "")))
+           (%set-cur-pos (param)
+                         (when (str-empty-p param)
+                           (setf *start-column* *cur-column*))))
+        (mapc
+         (lambda (ch)
+           (cond
+            ((literal-char-p ch)
+             (%mk-delim)
+             (%mk-ident)
+             (if (eq ch in-literal)
+                 (progn
+                   (push (make-lit lit-acc) res)
+                   (setf lit-acc "")
+                   (setf in-literal nil))
                (progn
-                 (push (make-lit acc) res)
-                 (setf acc "")
-                 (setf in-literal nil))
-             (progn
-               (when (str-empty-p acc)
-                 (setf *start-column* *cur-column*))
-               (setf in-literal ch))))
-          (in-literal
-           (setf acc (concat acc (char-to-string ch))))
+                 (%set-cur-pos lit-acc)
+                 (setf in-literal ch))))
 
-          ((delimiter-p ch)
-           (unless (str-empty-p acc)
-             (push (make-id acc) res)
-             (setf acc ""))
-           (push (make-delim ch) res))
+            (in-literal
+             (setf lit-acc (concat lit-acc (char-to-string ch))))
 
-          ((whitespace-p ch)
-           (unless (str-empty-p acc)
-             (push (make-id acc) res)
-             (setf acc ""))
-           (when (eq ch ?\n)
-             (setf *cur-column* 1)
-             (incf *cur-line*)))
+            ((delimiter-char-p ch)
+             (%mk-ident)
+             (%set-cur-pos delim-acc)
+             (setf delim-acc (concat delim-acc (char-to-string ch))))
 
-          ((identifier-p ch)
-           (when (str-empty-p acc)
-             (setf *start-column* *cur-column*))
-           (setf acc (concat acc (char-to-string ch))))
-          (t (error "give up at '%s'" (char-to-string ch))))
+            ((whitespace-char-p ch)
+             (%mk-delim)
+             (%mk-ident)
+             (when (eq ch ?\n)
+               (setf *cur-column* 1)
+               (incf *cur-line*)))
 
-         (incf *cur-column*))
-       (string-to-list str))
+            ((identifier-char-p ch)
+             (%mk-delim)
+             (%set-cur-pos acc)
+             (setf acc (concat acc (char-to-string ch))))
+            (t (error "give up at '%s'" (char-to-string ch))))
 
-      (unless (str-empty-p acc)
-        (push (make-id acc) res)
-        (setf acc ""))
+           (incf *cur-column*))
+         (string-to-list str))
+
+        (%mk-delim)
+        (%mk-ident))
       (reverse res))))
+
+(defun test () (lexer "Aa:Bb'sh;t 'Cc|Dd;
+Bb:Ee;"))
