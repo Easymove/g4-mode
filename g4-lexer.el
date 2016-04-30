@@ -72,7 +72,7 @@
 (defclass dot (delimiter)
   ())
 
-(defclass arrow (delimiter)
+(defclass r-arrow (delimiter)
   ())
 
 
@@ -91,7 +91,10 @@
 ;;; lexer regexps
 ;;; ---------------------------------------------------------
 (defun delimiter-char-p (char)
-  (string-match-p "[][;:()+*|?.]" (char-to-string char)))
+  (string-match-p "[][;:()+*|?./]" (char-to-string char)))
+
+(defun can-be-multidelim (str)
+  (string-match-p "[-/]" str))
 
 (defun whitespace-char-p (char)
   (string-match-p "[\s\n\t]" (char-to-string char)))
@@ -100,14 +103,22 @@
   (string-match-p "[']" (char-to-string char)))
 
 (defun identifier-char-p (char)
-  (string-match-p "[_[:word:]]" (char-to-string char)))
+  (string-match-p "[[:word:]]" (char-to-string char)))
 
 (defun identifier-p (str)
-  (string-match-p "[_[:word:]]*" str))
+  (string-match-p "[[:word:]]*" str))
+
+(defun line-comment-p (str)
+  (string-match-p "//" str))
+
+(defun block-comment-start-p (str)
+  (string-match-p "/\\*" str))
+
+(defun block-comment-end-p (str)
+  (string-match-p "\\*/" str))
 
 (defun multi-delimiter-p (str)
   (string-match-p "//(->//)" str))
-
 
 (defun str-next (str)
   (substring str 1 (length str)))
@@ -148,6 +159,7 @@
                ((equal str "|") 'pipe)
                ((equal str "?") 'interrogation)
                ((equal str ".") 'dot)
+               ((equal str "->") 'r-arrow)
                (t (error "%s is not a delimiter" str)))))
     (make-instance type
                    :start (make-instance 'position
@@ -170,7 +182,7 @@
   (unless (str-empty-p str)
     (let ((*cur-line* 1) (*cur-column* 1)
           (acc "") (lit-acc "") (delim-acc "")
-          (res) (in-literal))
+          (res) (in-literal) (in-block-comment) (in-line-comment))
 
       (cl-labels
           ((%mk-delim ()
@@ -187,8 +199,27 @@
         (mapc
          (lambda (ch)
            (cond
+            ((or in-block-comment
+                 in-line-comment)
+             (if (and in-block-comment
+                      (block-comment-end-p (concat acc (char-to-string ch))))
+                 (progn (setf acc "")
+                        (setf in-block-comment nil))
+               (setf acc (char-to-string ch)))
+             (when (eq ch ?\n)
+               (setf *cur-column* 1)
+               (incf *cur-line*)
+               (setf acc "")
+               (when in-line-comment
+                 (setf in-line-comment nil))))
+
+            ((whitespace-char-p ch)
+             (%mk-ident)
+             (when (eq ch ?\n)
+               (setf *cur-column* 1)
+               (incf *cur-line*)))
+
             ((literal-char-p ch)
-             (%mk-delim)
              (%mk-ident)
              (if (eq ch in-literal)
                  (progn
@@ -205,17 +236,17 @@
             ((delimiter-char-p ch)
              (%mk-ident)
              (%set-cur-pos delim-acc)
-             (setf delim-acc (concat delim-acc (char-to-string ch))))
-
-            ((whitespace-char-p ch)
-             (%mk-delim)
-             (%mk-ident)
-             (when (eq ch ?\n)
-               (setf *cur-column* 1)
-               (incf *cur-line*)))
+             (setf delim-acc (concat delim-acc (char-to-string ch)))
+             (cond ((line-comment-p delim-acc)
+                    (setf delim-acc "")
+                    (setf in-line-comment t))
+                   ((block-comment-start-p delim-acc)
+                    (setf delim-acc "")
+                    (setf in-block-comment t))
+                   ((can-be-multidelim delim-acc) t)
+                   (t (%mk-delim))))
 
             ((identifier-char-p ch)
-             (%mk-delim)
              (%set-cur-pos acc)
              (setf acc (concat acc (char-to-string ch))))
             (t (error "give up at '%s'" (char-to-string ch))))

@@ -40,7 +40,15 @@
 (defclass empty-command-node (command-node)
   ())
 
-(defclass entity-node (node value-mixin)
+(defclass entity-node-mixin (node value-mixin)
+  ((modifier :accessor modifier
+             :initarg :mod
+             :initform nil)))
+
+(defclass entity-node (entity-node-mixin)
+  ())
+
+(defclass complex-entity-node (entity-node-mixin)
   ())
 
 (defclass sort-node (node named-mixin)
@@ -52,7 +60,19 @@
   (grammar lexems))
 
 (defun grammar (lexems)
-  (rule-list lexems))
+  (when lexems
+    (multiple-value-bind (grammar-name rest) (grammar-def lexems)
+      (make-instance 'grammar-node
+                     :name grammar-name
+                     :members (rule-list rest)))))
+
+(defun grammar-def (lexems)
+  (if (and (typep (car lexems) 'identifier)
+           (equal (name (car lexems)) "grammar")
+           (typep (second lexems) 'identifier)
+           (typep (third lexems) 'semi-colon))
+      (values (name (second lexems)) (cdddr lexems))
+    (values "_default_" lexems)))
 
 (defun rule-list (lexems)
   (when lexems
@@ -134,12 +154,38 @@
 
 (defun entity (lexems)
   (when lexems
-    (if (or (typep (car lexems) 'identifier)
-            (typep (car lexems) 'literal))
-        (values (make-instance 'entity-node
-                               :value (car lexems)
-                               :start (spos (car lexems))
-                               :end (epos (car lexems)))
-                (cdr lexems))
-      (values nil lexems))))
+    (cond ((or (typep (car lexems) 'identifier)
+               (typep (car lexems) 'literal))
+           (let ((ent (make-instance 'entity-node
+                                     :value (car lexems)
+                                     :start (spos (car lexems))
+                                     :end (epos (car lexems))
+                                     :mod (cond ((typep (cadr lexems) 'star)
+                                                 :none-or-many)
+                                                ((typep (cadr lexems) 'plus)
+                                                 :one-or-many)
+                                                ((typep (cadr lexems) 'interrogation)
+                                                 :optional)
+                                                (t :default)))))
+             (values ent (if (eq (modifier ent) :default) (cdr lexems) (cddr lexems)))))
+          ((typep (car lexems) 'o-parenthesis)
+           (multiple-value-bind (ent-list rest) (entity-list (cdr lexems))
+             (if (and ent-list
+                      (typep (car rest) 'c-parenthesis))
+                 (let ((ent (make-instance 'complex-entity-node
+                                           :value ent-list
+                                           :start (spos (car lexems))
+                                           :end (epos (car rest))
+                                           :mod (cond ((typep (cadr rest) 'star)
+                                                       :none-or-many)
+                                                      ((typep (cadr rest) 'plus)
+                                                       :one-or-many)
+                                                      ((typep (cadr rest) 'interrogation)
+                                                       :optional)
+                                                      (t :default)))))
+                   (values ent (if (eq (modifier ent) :default) (cdr rest) (cddr rest))))
+               (error "ENTITY: close parenthesis expected. line: %s column: %s"
+                      (line (spos (car rest)))
+                      (column (spos (car rest)))))))
+          (t (values nil lexems)))))
 

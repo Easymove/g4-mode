@@ -1,11 +1,9 @@
 (defvar g4-mode-hook nil)
-
 (defvar g4-mode-map
   (let ((map (make-keymap)))
     (define-key map "\C-j" 'newline-and-indent)
     map))
-
-(add-to-list 'auto-mode-alist '("\\.g4\\'" . g4-mode))
+(defvar *current-grammar* nil)
 
 (defconst g4-font-lock-keywords
   (list
@@ -14,7 +12,6 @@
    '("//.*" . font-lock-comment-face)
    '("\\('.*?'\\)\\|\\(\\\\.\\)" . font-lock-string-face)
    '("[:|;]" . font-lock-keyword-face)))
-
 
 
 (defun g4-indent-line ()
@@ -42,11 +39,16 @@
   (let ((st (make-syntax-table)))
     (modify-syntax-entry ?_ "w" st)
     (modify-syntax-entry ?- "w" st)
-
     st))
 
 (defun load-g4 ()
-  (load "g4-lexer.el"))
+  (load "g4-lexer.el")
+  (load "g4-parser.el"))
+
+(defun parse-g4 ()
+  (interactive)
+  (setf *current-grammar* (parser (lexer (buffer-string))))
+  (message "parsed."))
 
 (defun g4-mode ()
   "major mode-for editing .g4 grammars"
@@ -63,5 +65,8 @@
   (setq major-mode 'g4-mode)
   (setq mode-name "g4-mode")
   (run-hooks 'g4-mode-hook))
+
+
+(add-to-list 'auto-mode-alist '("\\.g4\\'" . g4-mode))
 
 (provide 'g4-mode)
