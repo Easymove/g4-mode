@@ -43,7 +43,10 @@
 
 (defun load-g4 ()
   (load "g4-lexer.el")
-  (load "g4-parser.el"))
+  (load "g4-parser.el")
+  (load "g4-utils.el")
+  (load "g4-gotodef.el")
+  (load "test.el"))
 
 (defun parse-g4 ()
   (interactive)
@@ -55,16 +58,18 @@
   (interactive)
   (kill-all-local-variables)
   (load-g4)
+
   (set-syntax-table g4-mode-syntax-table)
   (use-local-map g4-mode-map)
 
   (set (make-local-variable 'font-lock-defaults) '(g4-font-lock-keywords))
-
   (set (make-local-variable 'indent-line-function) 'g4-indent-line)
 
   (setq major-mode 'g4-mode)
   (setq mode-name "g4-mode")
-  (run-hooks 'g4-mode-hook))
+  (run-hooks 'g4-mode-hook)
+
+  (parse-g4))
 
 
 (add-to-list 'auto-mode-alist '("\\.g4\\'" . g4-mode))

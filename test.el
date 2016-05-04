@@ -11,7 +11,7 @@
   (list 'defun name params
         (cons 'progn body)))
 
-(defun run-unit-tests ()
+(defun g4-unit-tests ()
   (interactive)
   (let ((failed-tests))
     (mapc (lambda (test)
@@ -19,7 +19,7 @@
                 (funcall test)
               (error (push test failed-tests))))
           *g4-unit-tests*)
-    (format "Failed tests:\n")
+    (print "Failed tests:")
     (mapc (lambda (test)
             (print (symbol-name test)))
           failed-tests)
@@ -56,3 +56,33 @@ sort1 : a b 'c' | d e f ; /**/
 sort2 : fuck | (fucking 'fuck')+ ;
 
 fucking : 'fucking' ;")))
+
+
+(def-test test-traverse ()
+  (let ((tree
+         (parser
+          (lexer
+           "
+sort1 : a b 'c' | d e f ; /**/
+
+sort2 : fuck | (fucking 'fuck')+ ;
+
+fucking : 'fucking' ;"))))
+
+    (traverse tree
+              (lambda (node)
+                (print node)))))
+
+
+(def-test test-find-def ()
+  (let ((*current-grammar*
+         (parser
+          (lexer
+           "
+sort1 : a b 'c' | d e f ; /**/
+
+sort2 : fuck | (fucking 'fuck')+ ;
+
+fucking : 'fucking' ;"))))
+
+    (find-def "sort1")))

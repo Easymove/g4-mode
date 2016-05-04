@@ -62,9 +62,11 @@
 (defun grammar (lexems)
   (when lexems
     (multiple-value-bind (grammar-name rest) (grammar-def lexems)
-      (make-instance 'grammar-node
-                     :name grammar-name
-                     :members (rule-list rest)))))
+      (multiple-value-bind (rules rest1) (rule-list rest)
+        (unless rest1
+          (make-instance 'grammar-node
+                         :name grammar-name
+                         :members rules))))))
 
 (defun grammar-def (lexems)
   (if (and (typep (car lexems) 'identifier)

@@ -178,9 +178,11 @@
 (defvar *cur-line* 0)
 (defvar *start-column* 0)
 
+
+;;; TODO: Fix position offset
 (defun lexer (str)
   (unless (str-empty-p str)
-    (let ((*cur-line* 1) (*cur-column* 1)
+    (let ((*cur-line* 1) (*cur-column* 0)
           (acc "") (lit-acc "") (delim-acc "")
           (res) (in-literal) (in-block-comment) (in-line-comment))
 
@@ -207,7 +209,7 @@
                         (setf in-block-comment nil))
                (setf acc (char-to-string ch)))
              (when (eq ch ?\n)
-               (setf *cur-column* 1)
+               (setf *cur-column* 0)
                (incf *cur-line*)
                (setf acc "")
                (when in-line-comment
@@ -216,7 +218,7 @@
             ((whitespace-char-p ch)
              (%mk-ident)
              (when (eq ch ?\n)
-               (setf *cur-column* 1)
+               (setf *cur-column* 0)
                (incf *cur-line*)))
 
             ((literal-char-p ch)
