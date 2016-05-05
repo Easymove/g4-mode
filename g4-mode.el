@@ -2,6 +2,8 @@
 (defvar g4-mode-map
   (let ((map (make-keymap)))
     (define-key map "\C-j" 'newline-and-indent)
+    (define-key map "\M-." 'g4-goto-definition)
+    (define-key map "\M-," 'g4-restore-position)
     map))
 (defvar *current-grammar* nil)
 
