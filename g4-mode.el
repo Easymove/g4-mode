@@ -1,9 +1,12 @@
 (defvar g4-mode-hook nil)
 (defvar g4-mode-map
   (let ((map (make-keymap)))
-    (define-key map "\C-j" 'newline-and-indent)
-    (define-key map "\M-." 'g4-goto-definition)
-    (define-key map "\M-," 'g4-restore-position)
+    (define-key map (kbd "C-j") 'newline-and-indent)
+    (define-key map (kbd "M-.") 'g4-goto-definition)
+    (define-key map (kbd "M-,") 'g4-restore-position)
+    (define-key map (kbd "C-h u") 'g4-highlight-unused)
+    (define-key map (kbd "C-h d") 'g4-highlight-undefined)
+    (define-key map (kbd "C-h z") 'g4-unhighlight-all)
     map))
 (defvar *current-grammar* nil)
 
@@ -48,7 +51,8 @@
   (load "g4-parser.el")
   (load "g4-utils.el")
   (load "g4-gotodef.el")
-  (load "test.el"))
+  (load "g4-analyzes.el")
+  (load "g4-test.el"))
 
 (defun parse-g4 ()
   (interactive)

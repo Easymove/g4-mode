@@ -15,17 +15,18 @@
 (defmethod traverse-next ((node members-mixin))
   (node-members node))
 
+(defmethod traverse-next ((node complex-entity-node))
+  (node-value node))
+
 (defmethod traverse-next (node)
   nil)
 
 (defun node-string-name (node)
-  (when (typep node 'named-mixin)
-    (let ((name (node-name node)))
-      (cond
-       ((typep name 'sort-node)
-        (node-string-name name))
-       ((typep name 'identifier)
-        (name name))
-       ((typep name 'literal)
-        (value name))
-       (t name)))))
+  (cond
+   ((typep node 'named-mixin)
+    (node-string-name (node-name node)))
+   ((typep node 'identifier)
+    (name node))
+   ((typep node 'literal)
+    (value node))
+   (t node)))
