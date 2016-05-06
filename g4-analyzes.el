@@ -67,7 +67,8 @@
 (defun g4-dump-to-dot ()
   (interactive)
   (let ((dot-str "") (id 0) (edges)
-        (node->id (make-hash-table)))
+        (node->id (make-hash-table))
+        (gr-name (node-string-name *current-grammar*)))
     (cl-labels ((%get-id () (incf id))
                 (%add (str) (setf dot-str (concat dot-str str)))
                 (%graph-header (name) (%add (format "digraph %s {\n" name)))
@@ -76,7 +77,8 @@
                              (if (gethash rule node->id)
                                  (gethash rule node->id)
                                (let ((cur-id (%get-id)))
-                                 (%add (format "%s [label=\"%s\", color=\"blue\", fillcolor=\"#89EED9\"];\n" cur-id (node-string-name rule)))
+                                 (%add (format "%s [label=\"%s\", color=\"blue\", style=\"filled\", fillcolor=\"#DCF7DF\"];\n"
+                                               cur-id (node-string-name rule)))
                                  (setf (gethash rule node->id) cur-id)
                                  (mapc (lambda (n)
                                          (let ((next-id (%build-rule n)))
@@ -85,18 +87,18 @@
                                  cur-id)))
                 (%build-edges ()
                               (mapc (lambda (pair)
-                                      (%add (format "%s -> %s;\n" (car pair) (cdr pair))))
+                                      (%add (format "%s -> %s [color=\"#374138\", style=\"dashed\"];\n" (car pair) (cdr pair))))
                                     edges))
                 (%build-graph (name next)
                               (%graph-header name)
                               (%build-rule (car next))
                               (%build-edges)
                               (%footer)))
-      (%build-graph (node-string-name *current-grammar*) (traverse-next *current-grammar*)))
+      (%build-graph gr-name (traverse-next *current-grammar*)))
 
     (with-temp-buffer
       (insert dot-str)
-      (write-region (point-min) (point-max) "graph.dot" nil nil nil t))
+      (write-region (point-min) (point-max) (format "%s.dot" gr-name) nil nil nil t))
 
     dot-str))
 
