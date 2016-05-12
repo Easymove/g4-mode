@@ -148,7 +148,7 @@
 
 
 (defun terminal-p (entity)
-  (cl-member (node-string-name entity) *terminals*))
+  (cl-member (node-string-name entity) *terminals* :test #'equal))
 
 
 (defun has-empty-command? (rule)
