@@ -138,13 +138,19 @@
 
 (defun command (lexems)
   (multiple-value-bind (ent-list rest) (entity-list lexems)
-    (if ent-list
-        (values (make-instance 'command-node
-                               :members ent-list
-                               :start (spos (car ent-list))
-                               :end (epos (car (last ent-list))))
-                rest)
-      (values nil rest))))
+    (cond
+     (ent-list
+      (values (make-instance 'command-node
+                             :members ent-list
+                             :start (spos (car ent-list))
+                             :end (epos (car (last ent-list))))
+              rest))
+     ((and (null ent-list)
+           (typep (car rest) 'pipe))
+      (values (make-instance 'empty-command-node
+                             :start (spos (car rest))
+                             :end (spos (car rest))) rest))
+     (t (values nil rest)))))
 
 (defun entity-list (lexems)
   (when lexems

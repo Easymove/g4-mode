@@ -86,3 +86,39 @@ sort2 : fuck | (fucking 'fuck')+ ;
 fucking : 'fucking' ;"))))
 
     (find-def "sort1")))
+
+
+(def-test test-first-set ()
+  (let ((*current-grammar*
+         (parser
+          (lexer
+           "
+A : B C | 'a' E ;
+
+B : 'b' | ;
+
+C : F | 'c' ;
+
+F : 'f1' | 'f2' ;
+
+E : B | 'e' ;"))))
+
+    (format "FIRST(A): %s" (mapcar #'node-string-name (first-set (lookup-name "A"))))))
+
+
+(def-test test-follow-set ()
+  (let ((*current-grammar*
+         (parser
+          (lexer
+           "
+A : B C | 'a' E ;
+
+B : 'b' | ;
+
+C : F | 'c' ;
+
+F : 'f1' | 'f2' ;
+
+E : B E | 'e' ;"))))
+
+    (format "FOLLOW(B): %s" (mapcar #'node-string-name (follow-set (lookup-name "B"))))))

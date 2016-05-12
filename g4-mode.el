@@ -7,6 +7,9 @@
     (define-key map (kbd "C-h u") 'g4-highlight-unused)
     (define-key map (kbd "C-h d") 'g4-highlight-undefined)
     (define-key map (kbd "C-h z") 'g4-unhighlight-all)
+    (define-key map (kbd "C-t a") 'g4-add-terminals)
+    (define-key map (kbd "C-t d") 'g4-delete-terminals)
+    (define-key map (kbd "C-t c") 'g4-clean-terminals)
     map))
 (defvar *current-grammar* nil)
 

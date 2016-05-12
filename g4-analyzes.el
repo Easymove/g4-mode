@@ -121,3 +121,76 @@
                            (equal name (node-string-name node)))
                   (throw 'res node))))
     name))
+
+
+;;; --------------------------------------------------------
+;;; Check grammar for LL(1) class
+;;; --------------------------------------------------------
+(defvar *terminals* nil)
+
+
+(defun g4-add-terminals ()
+  (interactive)
+  (let ((input (read-from-minibuffer "enter terminals: ")))
+    (mapc (lambda (x) (pushnew x *terminals* :test #'equal)) (split-string input))))
+
+
+(defun g4-delete-terminals ()
+  (interactive)
+  (let ((input (read-from-minibuffer "enter terminals: ")))
+    (mapc (lambda (x) (remove x *terminals* :test #'equal)) (split-string input))))
+
+
+(defun g4-clean-terminals ()
+  (interactive)
+  (setq *terminals* nil)
+  (message "terminals list was cleaned."))
+
+
+(defun terminal-p (entity)
+  (cl-member (node-string-name entity) *terminals*))
+
+
+(defun has-empty-command? (rule)
+  (and (typep rule 'rule-node)
+       (some (lambda (x) (typep x 'empty-command-node)) (node-members rule))))
+
+
+(defun first-set (rule)
+  (when (typep rule 'rule-node)
+    (reduce (lambda (x y) (union x y :test #'equal))
+            (mapcar
+             (lambda (command)
+               (let ((empty-p t))
+                 (reduce (lambda (acc x)
+                           (if empty-p
+                               (cond
+                                ((typep x 'identifier)
+                                 (if (terminal-p x)
+                                     (progn (setf empty-p nil)
+                                            (union acc (list x) :test #'equal))
+                                   (let ((n-rule (lookup-name (node-string-name x))))
+                                     (setf empty-p (has-empty-command? n-rule))
+                                     (union acc (first-set n-rule) :test #'equal))))
+                                ((typep x 'literal)
+                                 (setf empty-p nil)
+                                 (union acc (list x) :test #'equal)))
+                             acc))
+                         (mapcar #'node-value (node-members command))
+                         :initial-value nil)))
+             (node-members rule)))))
+
+
+(defun follow-set (rule)
+  (when (typep rule 'rule-node)
+    (let ((name (node-string-name rule))
+          (found) (res))
+      (traverse *current-grammar*
+                (lambda (x)
+                  (cond
+                   (found
+                    (setf res (union res (first-set (lookup-name (node-string-name (node-value x)))) :test #'equal))
+                    (setf found nil))
+                   ((typep x 'entity-node)
+                    (setf found (equal name (node-string-name (node-value x))))))))
+      res)))
