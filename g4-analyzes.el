@@ -190,7 +190,44 @@
                   (cond
                    (found
                     (setf res (union res (first-set (lookup-name (node-string-name (node-value x)))) :test #'equal))
-                    (setf found nil))
+                    (setf found (has-empty-command? x)))
                    ((typep x 'entity-node)
                     (setf found (equal name (node-string-name (node-value x))))))))
       res)))
+
+
+(defun command-first-set (command)
+  (let ((res) (empty-found t))
+    (traverse command
+              (lambda (x)
+                (when (and (typep x 'entity-node)
+                           empty-found)
+                  (setf res (union res (first-set (lookup-name (node-string-name (node-value x)))) :test #'equal))
+                  (setf empty-found (has-empty-command? (lookup-name (node-string-name (node-value x))))))))
+    res))
+
+
+(defun g4-check-LL-1 ()
+  (interactive)
+  (let ((res t) (conflicts))
+    (traverse *current-grammar*
+              (lambda (x)
+                (when (typep x 'rule-node)
+                  (let ((first-list))
+                    (traverse x
+                              (lambda (y)
+                                (push (command-first-set y) first-list)))
+                    (mapc (lambda (set1)
+                            (mapc (lambda (set2)
+                                    (let ((inters (intersection (mapcar #'node-string-name set1)
+                                                                (mapcar #'node-string-name set2) :test #'equal)))
+                                      (when (and (not (equal set1 set2))
+                                                 inters)
+                                        (push (mapcar #'node-string-name inters) conflicts)
+                                        (setf res nil))))
+                                  first-list))
+                          first-list)))))
+    (if res
+        (message "LL(1)!")
+      (message "not LL(1)! CONFLICTS: %s" conflicts))
+    res))
