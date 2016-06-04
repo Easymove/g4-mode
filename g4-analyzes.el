@@ -156,6 +156,20 @@
        (some (lambda (x) (typep x 'empty-command-node)) (node-members rule))))
 
 
+(defun g4-first ()
+  (interactive)
+  (let* ((requested-name (name-at-point))
+         (requested-rule (find-def requested-name)))
+    (message "FIRST SET: %s" (mapcar #'node-string-name (first-set requested-rule)))))
+
+
+(defun g4-follow ()
+  (interactive)
+  (let* ((requested-name (name-at-point))
+         (requested-rule (find-def requested-name)))
+    (message "FOLLOW SET: %s" (mapcar #'node-string-name (follow-set requested-rule)))))
+
+
 (defun first-set (rule)
   (when (typep rule 'rule-node)
     (reduce (lambda (x y) (union x y :test #'equal))
@@ -188,7 +202,7 @@
       (traverse *current-grammar*
                 (lambda (x)
                   (cond
-                   (found
+                   ((and found (typep x 'entity-node))
                     (setf res (union res (first-set (lookup-name (node-string-name (node-value x)))) :test #'equal))
                     (setf found (has-empty-command? x)))
                    ((typep x 'entity-node)
@@ -229,5 +243,7 @@
                           first-list)))))
     (if res
         (message "LL(1)!")
-      (message "not LL(1)! CONFLICTS: %s" conflicts))
+      (message "not LL(1)!")
+      ;; (message "not LL(1)! CONFLICTS: %s" conflicts)
+      )
     res))
